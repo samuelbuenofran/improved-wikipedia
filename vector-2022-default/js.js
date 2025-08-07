@@ -2,411 +2,516 @@
   'use strict';
 
   // === Configuration ===
-  const themes = {
-    Light: { background: '#ffffff', text: '#202124' },
-    Dark: { background: '#121212', text: '#eaeaea' },
-    Sepia: { background: '#f4ecd8', text: '#5b4636' },
-    HighContrast: { background: '#000000', text: '#ffff00' },
-    Ocean: { background: '#0f3460', text: '#e8f4fd' },
-    Forest: { background: '#1a2f1a', text: '#c8e6c9' }
+  const CONFIG = {
+    themes: {
+      Light: { background: '#ffffff', text: '#202124' },
+      Dark: { background: '#121212', text: '#eaeaea' },
+      Sepia: { background: '#f4ecd8', text: '#5b4636' },
+      HighContrast: { background: '#000000', text: '#ffff00' },
+      Ocean: { background: '#0f3460', text: '#e8f4fd' },
+      Forest: { background: '#1a2f1a', text: '#c8e6c9' }
+    },
+    fonts: {
+      Sans: '"Segoe UI", "Helvetica Neue", sans-serif',
+      Serif: '"Georgia", "Times New Roman", serif',
+      Mono: '"Courier New", monospace',
+      Modern: '"Inter", "SF Pro Display", sans-serif'
+    },
+    darkThemes: new Set(['Dark', 'HighContrast', 'Ocean', 'Forest']),
+    transitions: {
+      duration: 400,
+      revealDelay: 50
+    },
+    selectors: {
+      modern: ['#mw-panel', '#mw-head', '#footer', '.vector-menu', '.mw-editsection'],
+      legacy: ['#column-one', '#p-cactions', '#p-personal', '#footer .portlet']
+    }
   };
 
-  const fonts = {
-    Sans: '"Segoe UI", "Helvetica Neue", sans-serif',
-    Serif: '"Georgia", "Times New Roman", serif',
-    Mono: '"Courier New", monospace',
-    Modern: '"Inter", "SF Pro Display", sans-serif'
+  // Cache DOM queries and computed values
+  const CACHE = {
+    themeNames: Object.keys(CONFIG.themes),
+    fontNames: Object.keys(CONFIG.fonts),
+    elements: new Map()
   };
 
-  const themeNames = Object.keys(themes);
-  const fontNames = Object.keys(fonts);
+  // State management
+  const STATE = {
+    currentThemeIndex: 0,
+    citationsHidden: false,
+    menuCollapsed: false,
+    autoHideTimeout: null,
+    dragging: false,
+    dragOffset: { x: 0, y: 0 }
+  };
 
-  let currentThemeIndex = 0;
-  let citationsHidden = false;
+  // DOM elements
   let statusBar, floatingMenu;
-  let menuCollapsed = false;
-  let autoHideTimeout;
 
-    // === Enhanced Core Features ===
-    function applyTheme(name) {
-      if (!name || !themes[name]) {
-        console.warn(`Theme '${name}' not found`);
-        return;
+  // === Utility Functions ===
+  const utils = {
+    // Memoized element getter with caching
+    getElement(id) {
+      if (!CACHE.elements.has(id)) {
+        CACHE.elements.set(id, document.getElementById(id));
       }
+      return CACHE.elements.get(id);
+    },
+
+    // Batch DOM updates for better performance
+    batchStyleUpdates(element, styles) {
+      if (!element || typeof styles !== 'object') return;
       
-      const t = themes[name];
-      const root = document.documentElement;
+      // Use cssText for better performance when setting multiple properties
+      const cssText = Object.entries(styles)
+        .map(([prop, value]) => `${prop.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${value}`)
+        .join('; ');
       
-      root.style.setProperty('--bg-color', t.background);
-      root.style.setProperty('--text-color', t.text);
-      document.body.style.backgroundColor = t.background;
-      document.body.style.color = t.text;
-      localStorage.setItem('wikiTheme', name);
-      showStatus(`Theme: ${name}`);
-      updateMenuColors(name);
-    }
+      element.style.cssText += '; ' + cssText;
+    },
 
-  function updateMenuColors(themeName) {
-    // Validate inputs
-    if (!floatingMenu || !floatingMenu.style || !floatingMenu.querySelectorAll) return;
-    if (typeof themeName !== 'string') return;
-    
-    // Define themes array as constant for better maintainability
-    const DARK_THEMES = ['Dark', 'HighContrast', 'Ocean', 'Forest'];
-    const isDark = DARK_THEMES.includes(themeName);
-    
-    const menuBg = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)';
-    const itemBg = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)';
-    const textColor = isDark ? '#fff' : '#000';
-    
-    // Set menu background
-    floatingMenu.style.background = menuBg;
-    
-    // Optimize DOM query and update menu items
-    const menuItems = floatingMenu.querySelectorAll('.menu-item');
-    for (let i = 0; i < menuItems.length; i++) {
-      const item = menuItems[i];
-      item.style.background = itemBg;
-      item.style.color = textColor;
-    }
-  }
+    // Safe localStorage operations with error handling
+    storage: {
+      get(key, defaultValue = null) {
+        try {
+          return localStorage.getItem(key) || defaultValue;
+        } catch (e) {
+          console.warn(`Failed to get localStorage item '${key}':`, e);
+          return defaultValue;
+        }
+      },
+      set(key, value) {
+        try {
+          localStorage.setItem(key, value);
+          return true;
+        } catch (e) {
+          console.warn(`Failed to set localStorage item '${key}':`, e);
+          return false;
+        }
+      },
+      remove(key) {
+        try {
+          localStorage.removeItem(key);
+          return true;
+        } catch (e) {
+          console.warn(`Failed to remove localStorage item '${key}':`, e);
+          return false;
+        }
+      }
+    },
 
-  function applyFont(name) {
-    // Validate input parameter
-    if (!name || typeof name !== 'string') {
-      console.warn('Invalid font name provided');
-      return;
-    }
-    
-    // Check if font exists in fonts object
-    if (!fonts || !fonts.hasOwnProperty(name)) {
-      console.warn(`Font '${name}' not found in fonts configuration`);
-      return;
-    }
-    
-    // Apply font style
-    document.body.style.fontFamily = fonts[name];
-    
-    // Safely store in localStorage with error handling
-    try {
-      localStorage.setItem('wikiFont', name);
-    } catch (e) {
-      console.warn('Failed to save font preference to localStorage:', e);
-    }
-    
-    showStatus(`Font: ${name}`);
-  }
+    // Debounced function execution
+    debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    },
 
-  function toggleReadMode() {
-    const TRANSITION_DURATION = 400;
-    const REVEAL_DELAY = 50;
-    const selectors = ['#mw-panel', '#mw-head', '#footer', '.vector-menu', '.mw-editsection'];
-    const isReadMode = document.body.classList.toggle('read-mode');
-  
-    // Helper to safely add transition without overwriting existing ones
-    function addTransition(element, transition) {
+    // Safe element transition helper
+    addTransition(element, transition) {
+      if (!element?.style) return;
       const current = element.style.transition;
       if (!current.includes(transition)) {
         element.style.transition = current ? `${current}, ${transition}` : transition;
       }
     }
-  
-    selectors.forEach(sel => {
-      const el = document.querySelector(sel);
-      if (!el) return;
-  
-      addTransition(el, 'opacity 0.4s, transform 0.4s');
-  
-      if (isReadMode) {
-        el.style.opacity = '0';
-        el.style.transform = 'translateX(-20px)';
-        setTimeout(() => el.style.display = 'none', TRANSITION_DURATION);
-      } else {
-        el.style.display = '';
-        setTimeout(() => {
-          el.style.opacity = '1';
-          el.style.transform = 'translateX(0)';
-        }, REVEAL_DELAY);
-      }
+  };
+
+  // === Core Theme Functions ===
+  function applyTheme(name) {
+    const theme = CONFIG.themes[name];
+    if (!theme) {
+      console.warn(`Theme '${name}' not found`);
+      return false;
+    }
+    
+    const root = document.documentElement;
+    
+    // Batch CSS custom property updates
+    utils.batchStyleUpdates(root, {
+      '--bg-color': theme.background,
+      '--text-color': theme.text
     });
-  
-    const content = document.getElementById('content');
+    
+    // Apply to body
+    utils.batchStyleUpdates(document.body, {
+      backgroundColor: theme.background,
+      color: theme.text
+    });
+    
+    // Save preference and update UI
+    utils.storage.set('wikiTheme', name);
+    updateMenuColors(name);
+    showStatus(`Theme: ${name}`);
+    return true;
+  }
+
+  function updateMenuColors(themeName) {
+    if (!floatingMenu?.style || typeof themeName !== 'string') return;
+    
+    const isDark = CONFIG.darkThemes.has(themeName);
+    const colors = {
+      menuBg: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)',
+      itemBg: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.3)',
+      textColor: isDark ? '#fff' : '#000'
+    };
+    
+    floatingMenu.style.background = colors.menuBg;
+    
+    // Use more efficient query and update
+    const menuItems = floatingMenu.querySelectorAll('.menu-item');
+    menuItems.forEach(item => {
+      utils.batchStyleUpdates(item, {
+        background: colors.itemBg,
+        color: colors.textColor
+      });
+    });
+  }
+
+  function applyFont(name) {
+    const font = CONFIG.fonts[name];
+    if (!font) {
+      console.warn(`Font '${name}' not found`);
+      return false;
+    }
+    
+    document.body.style.fontFamily = font;
+    utils.storage.set('wikiFont', name);
+    showStatus(`Font: ${name}`);
+    return true;
+  }
+
+  // === Enhanced Mode Functions ===
+  function toggleReadMode() {
+    const isReadMode = document.body.classList.toggle('read-mode');
+    const selectors = CONFIG.selectors.modern;
+    
+    selectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (!el) return;
+        
+        utils.addTransition(el, 'opacity 0.4s, transform 0.4s');
+        
+        if (isReadMode) {
+          utils.batchStyleUpdates(el, {
+            opacity: '0',
+            transform: 'translateX(-20px)'
+          });
+          setTimeout(() => el.style.display = 'none', CONFIG.transitions.duration);
+        } else {
+          el.style.display = '';
+          setTimeout(() => {
+            utils.batchStyleUpdates(el, {
+              opacity: '1',
+              transform: 'translateX(0)'
+            });
+          }, CONFIG.transitions.revealDelay);
+        }
+      });
+    });
+    
+    // Handle content area
+    const content = utils.getElement('content');
     if (content) {
-      addTransition(content, 'max-width 0.4s, margin 0.4s');
-      if (isReadMode) {
-        content.style.maxWidth = 'none';
-        content.style.marginLeft = '0';
-      } else {
-        content.style.maxWidth = '';
-        content.style.marginLeft = '';
-      }
+      utils.addTransition(content, 'max-width 0.4s, margin 0.4s');
+      utils.batchStyleUpdates(content, {
+        maxWidth: isReadMode ? 'none' : '',
+        marginLeft: isReadMode ? '0' : ''
+      });
     }
-  
-    // Guard against missing or broken showStatus
-    if (typeof showStatus === 'function') {
-      showStatus(`Read Mode: ${isReadMode ? 'On' : 'Off'}`);
-    }
+    
+    showStatus(`Read Mode: ${isReadMode ? 'On' : 'Off'}`);
   }
 
   function toggleCitations() {
-    document.querySelectorAll('.reference').forEach(ref => {
-      ref.style.transition = 'opacity 0.3s';
-      ref.style.display = citationsHidden ? '' : 'none';
+    const references = document.querySelectorAll('.reference');
+    references.forEach(ref => {
+      utils.batchStyleUpdates(ref, {
+        transition: 'opacity 0.3s',
+        display: STATE.citationsHidden ? '' : 'none'
+      });
     });
-    citationsHidden = !citationsHidden;
-    showStatus(`Citations: ${citationsHidden ? 'Hidden' : 'Visible'}`);
+    
+    STATE.citationsHidden = !STATE.citationsHidden;
+    showStatus(`Citations: ${STATE.citationsHidden ? 'Hidden' : 'Visible'}`);
   }
 
   function toggleMenuCollapse() {
-    menuCollapsed = !menuCollapsed;
+    STATE.menuCollapsed = !STATE.menuCollapsed;
     const items = floatingMenu.querySelectorAll('.menu-item');
     const toggleBtn = floatingMenu.querySelector('.toggle-btn');
     
     items.forEach((item, index) => {
       if (item === toggleBtn) return;
+      
       item.style.transition = 'all 0.3s ease-in-out';
-      if (menuCollapsed) {
-        item.style.opacity = '0';
-        item.style.transform = 'translateX(20px)';
+      
+      if (STATE.menuCollapsed) {
+        utils.batchStyleUpdates(item, {
+          opacity: '0',
+          transform: 'translateX(20px)'
+        });
         setTimeout(() => item.style.display = 'none', 300);
       } else {
         item.style.display = 'flex';
         setTimeout(() => {
-          item.style.opacity = '1';
-          item.style.transform = 'translateX(0)';
+          utils.batchStyleUpdates(item, {
+            opacity: '1',
+            transform: 'translateX(0)'
+          });
         }, index * 50);
       }
     });
     
-    toggleBtn.innerHTML = `<span class="material-icons">${menuCollapsed ? 'expand_more' : 'expand_less'}</span>`;
-    showStatus(`Menu: ${menuCollapsed ? 'Collapsed' : 'Expanded'}`);
+    toggleBtn.innerHTML = `<span class="material-icons">${STATE.menuCollapsed ? 'expand_more' : 'expand_less'}</span>`;
+    showStatus(`Menu: ${STATE.menuCollapsed ? 'Collapsed' : 'Expanded'}`);
   }
 
+  // === UI Functions ===
   function showStatus(text) {
     if (!statusBar) return;
-    statusBar.innerHTML = `<span class="material-icons" style="font-size: 16px; margin-right: 6px;">info</span>${text}`;
-    statusBar.style.opacity = '1';
-    statusBar.style.transform = 'translateY(0)';
     
-    clearTimeout(autoHideTimeout);
-    autoHideTimeout = setTimeout(() => {
-      statusBar.style.opacity = '0';
-      statusBar.style.transform = 'translateY(10px)';
+    statusBar.innerHTML = `<span class="material-icons" style="font-size: 16px; margin-right: 6px;">info</span>${text}`;
+    
+    utils.batchStyleUpdates(statusBar, {
+      opacity: '1',
+      transform: 'translateY(0)'
+    });
+    
+    clearTimeout(STATE.autoHideTimeout);
+    STATE.autoHideTimeout = setTimeout(() => {
+      utils.batchStyleUpdates(statusBar, {
+        opacity: '0',
+        transform: 'translateY(10px)'
+      });
     }, 3000);
   }
 
   function restorePreferences() {
-    const theme = localStorage.getItem('wikiTheme') || 
-      (new Date().getHours() >= 7 && new Date().getHours() < 19 ? 'Light' : 'Dark');
-    currentThemeIndex = themeNames.indexOf(theme);
+    // Smart theme detection with time-based fallback
+    const savedTheme = utils.storage.get('wikiTheme');
+    const autoTheme = new Date().getHours() >= 7 && new Date().getHours() < 19 ? 'Light' : 'Dark';
+    const theme = savedTheme || autoTheme;
+    
+    STATE.currentThemeIndex = CACHE.themeNames.indexOf(theme);
     applyTheme(theme);
 
-    const font = localStorage.getItem('wikiFont') || 'Sans';
+    const font = utils.storage.get('wikiFont', 'Sans');
     applyFont(font);
     
-    // Restore menu position
-    const savedPosition = localStorage.getItem('wikiMenuPosition');
+    // Restore menu position with error handling
+    const savedPosition = utils.storage.get('wikiMenuPosition');
     if (savedPosition && floatingMenu) {
-      const pos = JSON.parse(savedPosition);
-      Object.assign(floatingMenu.style, pos);
+      try {
+        const position = JSON.parse(savedPosition);
+        Object.assign(floatingMenu.style, position);
+      } catch (e) {
+        console.warn('Failed to restore menu position:', e);
+      }
     }
   }
 
-  function saveMenuPosition() {
+  const saveMenuPosition = utils.debounce(() => {
     if (!floatingMenu) return;
-    const rect = floatingMenu.getBoundingClientRect();
+    
     const position = {
       left: floatingMenu.style.left || 'unset',
       top: floatingMenu.style.top || 'unset',
       right: floatingMenu.style.right || '20px',
       bottom: floatingMenu.style.bottom || 'unset'
     };
-    localStorage.setItem('wikiMenuPosition', JSON.stringify(position));
-  }
+    
+    utils.storage.set('wikiMenuPosition', JSON.stringify(position));
+  }, 300);
 
-  // === Enhanced Interface Creation ===
+  // === Interface Creation ===
   function createFloatingMenu() {
-    // Load Material Icons
+    // Load Material Icons with error handling
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons';
     link.rel = 'stylesheet';
+    link.onerror = () => console.warn('Failed to load Material Icons');
     document.head.appendChild(link);
 
     floatingMenu = document.createElement('div');
     floatingMenu.className = 'floating-menu';
-    Object.assign(floatingMenu.style, {
-      position: 'fixed',
-      top: '50%',
-      right: '20px',
-      transform: 'translateY(-50%)',
-      zIndex: '9999',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px',
-      padding: '1rem',
-      borderRadius: '1.5rem',
-      cursor: 'move',
-      background: 'rgba(255,255,255,0.25)',
-      backdropFilter: 'blur(10px)',
-      isolation: 'isolate',
-      transition: 'all 0.4s ease-in-out',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)'
-    });
+    
+    // Use cssText for better performance
+    floatingMenu.style.cssText = `
+      position: fixed; top: 50%; right: 20px; transform: translateY(-50%);
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+      padding: 1rem; border-radius: 1.5rem; cursor: move;
+      background: rgba(255,255,255,0.25); backdrop-filter: blur(10px);
+      isolation: isolate; transition: all 0.4s ease-in-out;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2);
+    `;
 
-    // Enhanced drag functionality with position saving
-    let dragging = false, offsetX = 0, offsetY = 0;
-    floatingMenu.addEventListener('mousedown', e => {
+    // Enhanced drag functionality
+    const handleMouseDown = (e) => {
       if (e.target.closest('.menu-item')) return;
-      dragging = true;
-      offsetX = e.clientX - floatingMenu.getBoundingClientRect().left;
-      offsetY = e.clientY - floatingMenu.getBoundingClientRect().top;
+      STATE.dragging = true;
+      const rect = floatingMenu.getBoundingClientRect();
+      STATE.dragOffset.x = e.clientX - rect.left;
+      STATE.dragOffset.y = e.clientY - rect.top;
       floatingMenu.style.transition = 'none';
       floatingMenu.style.cursor = 'grabbing';
-    });
+    };
     
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      floatingMenu.style.left = `${e.clientX - offsetX}px`;
-      floatingMenu.style.top = `${e.clientY - offsetY}px`;
-      floatingMenu.style.right = 'unset';
-      floatingMenu.style.bottom = 'unset';
-      floatingMenu.style.transform = 'none';
-    });
+    const handleMouseMove = (e) => {
+      if (!STATE.dragging) return;
+      utils.batchStyleUpdates(floatingMenu, {
+        left: `${e.clientX - STATE.dragOffset.x}px`,
+        top: `${e.clientY - STATE.dragOffset.y}px`,
+        right: 'unset',
+        bottom: 'unset',
+        transform: 'none'
+      });
+    };
     
-    document.addEventListener('mouseup', () => {
-      if (dragging) {
-        dragging = false;
-        floatingMenu.style.transition = 'all 0.4s ease-in-out';
-        floatingMenu.style.cursor = 'move';
+    const handleMouseUp = () => {
+      if (STATE.dragging) {
+        STATE.dragging = false;
+        utils.batchStyleUpdates(floatingMenu, {
+          transition: 'all 0.4s ease-in-out',
+          cursor: 'move'
+        });
         saveMenuPosition();
       }
-    });
+    };
 
-    // Enhanced button creation
+    floatingMenu.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Enhanced button creation with better performance
     const createItem = (icon, label, action, isToggle = false) => {
       const item = document.createElement('div');
       item.className = isToggle ? 'menu-item toggle-btn' : 'menu-item';
       item.innerHTML = `<span class="material-icons">${icon}</span>${label ? `<span class="label">${label}</span>` : ''}`;
-      Object.assign(item.style, {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        fontSize: '16px',
-        color: '#000',
-        padding: '10px 12px',
-        borderRadius: '1rem',
-        background: 'rgba(255,255,255,0.3)',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease-in-out',
-        userSelect: 'none'
+      
+      item.style.cssText = `
+        display: flex; align-items: center; gap: 8px; font-size: 16px;
+        color: #000; padding: 10px 12px; border-radius: 1rem;
+        background: rgba(255,255,255,0.3); cursor: pointer;
+        transition: all 0.2s ease-in-out; user-select: none;
+      `;
+      
+      // Use more efficient event handlers
+      item.addEventListener('mouseenter', () => {
+        utils.batchStyleUpdates(item, {
+          background: 'rgba(255,255,255,0.5)',
+          transform: 'translateX(-2px)'
+        });
       });
       
-      item.onmouseover = () => {
-        item.style.background = 'rgba(255,255,255,0.5)';
-        item.style.transform = 'translateX(-2px)';
-      };
-      item.onmouseout = () => {
-        item.style.background = 'rgba(255,255,255,0.3)';
-        item.style.transform = 'translateX(0)';
-      };
-      item.onclick = action;
+      item.addEventListener('mouseleave', () => {
+        utils.batchStyleUpdates(item, {
+          background: 'rgba(255,255,255,0.3)',
+          transform: 'translateX(0)'
+        });
+      });
+      
+      item.addEventListener('click', action);
       return item;
     };
 
-    // Add toggle button first
-    floatingMenu.appendChild(createItem('expand_less', '', toggleMenuCollapse, true));
-    floatingMenu.appendChild(createItem('visibility_off', 'Citations', toggleCitations));
-    floatingMenu.appendChild(createItem('chrome_reader_mode', 'Read Mode', toggleReadMode));
-    floatingMenu.appendChild(createItem('palette', 'Theme', () => {
-      currentThemeIndex = (currentThemeIndex + 1) % themeNames.length;
-      applyTheme(themeNames[currentThemeIndex]);
-    }));
-    floatingMenu.appendChild(createItem('font_download', 'Font', () => {
-      const currentFont = localStorage.getItem('wikiFont') || 'Sans';
-      const nextIndex = (fontNames.indexOf(currentFont) + 1) % fontNames.length;
-      applyFont(fontNames[nextIndex]);
-    }));
-    floatingMenu.appendChild(createItem('refresh', 'Reset', () => {
-      localStorage.removeItem('wikiTheme');
-      localStorage.removeItem('wikiFont');
-      localStorage.removeItem('wikiMenuPosition');
-      location.reload();
-    }));
+    // Menu items with optimized actions
+    const menuItems = [
+      ['expand_less', '', toggleMenuCollapse, true],
+      ['visibility_off', 'Citations', toggleCitations],
+      ['chrome_reader_mode', 'Read Mode', toggleReadMode],
+      ['palette', 'Theme', () => {
+        STATE.currentThemeIndex = (STATE.currentThemeIndex + 1) % CACHE.themeNames.length;
+        applyTheme(CACHE.themeNames[STATE.currentThemeIndex]);
+      }],
+      ['font_download', 'Font', () => {
+        const currentFont = utils.storage.get('wikiFont', 'Sans');
+        const nextIndex = (CACHE.fontNames.indexOf(currentFont) + 1) % CACHE.fontNames.length;
+        applyFont(CACHE.fontNames[nextIndex]);
+      }],
+      ['refresh', 'Reset', () => {
+        ['wikiTheme', 'wikiFont', 'wikiMenuPosition'].forEach(key => utils.storage.remove(key));
+        location.reload();
+      }]
+    ];
+
+    menuItems.forEach(([icon, label, action, isToggle]) => {
+      floatingMenu.appendChild(createItem(icon, label, action, isToggle));
+    });
 
     document.body.appendChild(floatingMenu);
   }
 
   function createStatusBar() {
-    // Declare the variable properly to avoid global pollution
-    let statusBar = document.createElement('div');
+    statusBar = document.createElement('div');
     statusBar.className = 'status-bar';
     
-    // Check if document.body exists before appending
     if (!document.body) {
       throw new Error('Document body not available');
     }
     
-    // Use CSS text for better performance and maintainability
     statusBar.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 9998;
-      padding: 8px 16px;
-      border-radius: 1rem;
-      font-size: 14px;
-      font-family: sans-serif;
-      background: rgba(0,0,0,0.8);
-      color: #fff;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-      transition: all 0.3s ease-in-out;
-      opacity: 0;
-      transform: translateY(10px);
-      display: flex;
-      align-items: center;
+      position: fixed; bottom: 20px; right: 20px; z-index: 9998;
+      padding: 8px 16px; border-radius: 1rem; font-size: 14px;
+      font-family: sans-serif; background: rgba(0,0,0,0.8); color: #fff;
+      backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      transition: all 0.3s ease-in-out; opacity: 0; transform: translateY(10px);
+      display: flex; align-items: center;
     `;
     
     document.body.appendChild(statusBar);
-    
-    // Return the element for further manipulation and cleanup
-    return statusBar;
   }
 
   // === Enhanced Hotkeys ===
-  window.addEventListener('keydown', e => {
+  const keyActions = {
+    r: toggleReadMode,
+    t: () => {
+      STATE.currentThemeIndex = (STATE.currentThemeIndex + 1) % CACHE.themeNames.length;
+      applyTheme(CACHE.themeNames[STATE.currentThemeIndex]);
+    },
+    c: toggleCitations,
+    m: toggleMenuCollapse
+  };
+
+  const handleKeydown = (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     
-    const k = e.key.toLowerCase();
-    if (k === 'r') {
+    const action = keyActions[e.key.toLowerCase()];
+    if (action) {
       e.preventDefault();
-      toggleReadMode();
+      action();
     }
-    if (k === 't') {
-      e.preventDefault();
-      currentThemeIndex = (currentThemeIndex + 1) % themeNames.length;
-      applyTheme(themeNames[currentThemeIndex]);
-    }
-    if (k === 'c') {
-      e.preventDefault();
-      toggleCitations();
-    }
-    if (k === 'm') {
-      e.preventDefault();
-      toggleMenuCollapse();
-    }
-  });
+  };
 
-  // === Entry ===
-  window.addEventListener('load', () => {
-    createStatusBar();
-    createFloatingMenu();
-    restorePreferences();
-    showStatus('Wikipedia Enhanced - Ready!');
-  });
+  // === Initialization ===
+  const initialize = () => {
+    try {
+      createStatusBar();
+      createFloatingMenu();
+      restorePreferences();
+      showStatus('Wikipedia Enhanced - Ready!');
+    } catch (error) {
+      console.error('Failed to initialize Wikipedia Enhancement:', error);
+    }
+  };
 
-  // Optional: Load signature helper
-  if (typeof mw !== 'undefined') {
-    mw.loader.load('//en.wikipedia.org/w/index.php?title=User:SandWafer/sig.js&action=raw&ctype=text/javascript');
+  // Event listeners
+  window.addEventListener('keydown', handleKeydown);
+  window.addEventListener('load', initialize);
+
+  // Optional: Load signature helper with error handling
+  if (typeof mw !== 'undefined' && mw.loader) {
+    try {
+      mw.loader.load('//en.wikipedia.org/w/index.php?title=User:SandWafer/sig.js&action=raw&ctype=text/javascript');
+    } catch (e) {
+      console.warn('Failed to load signature helper:', e);
+    }
   }
 })();
