@@ -1,0 +1,260 @@
+/* Enhanced Liquid Glass Floating Menu - Timeless (Modern) */
+.floating-menu {
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  z-index: 9999;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  align-items: flex-start;
+  border-radius: 1.75rem;
+  cursor: move;
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px) saturate(1.3) brightness(1.1);
+  isolation: isolate;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.floating-menu:hover {
+  box-shadow: 
+    0 16px 50px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.18);
+  transform: translateY(-50%) scale(1.02) translateZ(0);
+  backdrop-filter: blur(16px) saturate(1.4) brightness(1.15);
+}
+
+.floating-menu .menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  color: black;
+  padding: 8px 12px;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.28);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 500;
+  align-items: flex-start;
+  backdrop-filter: blur(8px);
+}
+
+.floating-menu .menu-item:hover {
+  background: rgba(255, 255, 255, 0.45);
+  transform: translateX(-2px) translateZ(0);
+  box-shadow: 
+    0 6px 16px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+}
+
+.floating-menu .menu-item:active {
+  transform: translateX(-1px) scale(0.98) translateZ(0);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.floating-menu .toggle-btn {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  justify-content: center;
+}
+
+.floating-menu .toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(16px);
+}
+
+/* Material Icons Modern Style */
+.material-icons {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: normal;
+  font-size: 20px;
+  vertical-align: middle;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-item:hover .material-icons {
+  transform: scale(1.1) translateZ(0);
+}
+
+.label {
+  font-weight: 500;
+  white-space: nowrap;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+/* Enhanced Status Bar - Modern */
+.status-bar {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9998;
+  padding: 10px 16px;
+  border-radius: 1.25rem;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.01em;
+}
+
+/* Read Mode Enhancements - Timeless */
+body.read-mode .mw-workspace-container .mw-content-container,
+body.read-mode .sidebar,
+body.read-mode .tools,
+body.read-mode #personal,
+body.read-mode #site-navigation {
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+body.read-mode .mw-body {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 2.5rem !important;
+}
+
+/* Timeless-specific element transitions */
+.mw-workspace-container .mw-content-container,
+.sidebar, .tools, #personal, #site-navigation {
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Advanced dark theme adaptations */
+@media (prefers-color-scheme: dark) {
+  .floating-menu {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px) saturate(1.4) brightness(0.9);
+  }
+  
+  .floating-menu:hover {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px) saturate(1.5) brightness(1.0);
+  }
+  
+  .floating-menu .menu-item {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .floating-menu .menu-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* Ultra-responsive design */
+@media (max-width: 1200px) {
+  .floating-menu {
+    right: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .floating-menu {
+    right: 12px;
+    padding: 6px 10px;
+    gap: 3px;
+    border-radius: 1.5rem;
+  }
+  
+  .floating-menu .menu-item {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 1rem;
+  }
+  
+  .material-icons {
+    font-size: 18px;
+  }
+  
+  .label {
+    font-size: 12px;
+  }
+  
+  .status-bar {
+    right: 12px;
+    bottom: 15px;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .floating-menu {
+    right: 8px;
+    padding: 4px 8px;
+    gap: 2px;
+    border-radius: 1.25rem;
+  }
+  
+  .floating-menu .menu-item {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 0.875rem;
+  }
+  
+  .material-icons {
+    font-size: 16px;
+  }
+  
+  .label {
+    font-size: 11px;
+  }
+}
+
+/* High refresh rate displays */
+@media (min-resolution: 120dpi) {
+  .floating-menu {
+    backdrop-filter: blur(16px) saturate(1.4) brightness(1.1);
+  }
+  
+  .floating-menu:hover {
+    backdrop-filter: blur(20px) saturate(1.5) brightness(1.2);
+  }
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .floating-menu,
+  .floating-menu .menu-item,
+  .material-icons {
+    transition: none;
+  }
+}
+
+/* High contrast accessibility */
+@media (prefers-contrast: high) {
+  .floating-menu {
+    border: 2px solid rgba(0, 0, 0, 0.3);
+  }
+  
+  .floating-menu .menu-item {
+    border: 1px solid rgba(0, 0, 0, 0.2);
+  }
+}
